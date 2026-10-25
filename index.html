@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Repositori Berkas — Teknik Informatika TI24A</title>
+  <meta name="description" content="Pusat penyimpanan berkas, materi perkuliahan, dan tugas praktikum mahasiswa Teknik Informatika Kelas TI24A.">
+  
+  <!-- Font Google: Plus Jakarta Sans (Modern, Clean, Elegant) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Hidden File Input for Native File Picker -->
+  <input type="file" id="globalFileInput" class="hidden-input" multiple>
+
+  <!-- Fullscreen Drag & Drop Overlay -->
+  <div id="dragDropOverlay" class="drag-overlay hidden">
+    <div class="drag-box">
+      <div class="drag-icon-pulse">
+        <i data-lucide="upload-cloud"></i>
+      </div>
+      <h3>Lepaskan Berkas di Sini</h3>
+      <p>Berkas akan langsung tersimpan ke Repositori TI24A</p>
+    </div>
+  </div>
+
+  <!-- Header Navigasi -->
+  <header class="app-header">
+    <div class="header-container">
+      
+      <!-- Brand Logo & Title -->
+      <div class="brand" id="brandHome" title="Kembali ke Beranda Repositori">
+        <div class="brand-badge-icon">
+          <i data-lucide="layers"></i>
+        </div>
+        <div class="brand-text-group">
+          <div class="brand-title-row">
+            <span class="brand-title">Teknik Informatika</span>
+            <span class="badge-class">TI24A</span>
+          </div>
+          <span class="brand-caption">Repositori Berkas & Tugas Kuliah</span>
+        </div>
+      </div>
+
+      <!-- Search Input -->
+      <div class="header-search-wrap">
+        <div class="search-box">
+          <i data-lucide="search" class="search-icon"></i>
+          <input type="text" id="searchInput" placeholder="Cari materi, tugas, modul praktikum..." autocomplete="off">
+          <button id="btnClearSearch" class="btn-clear-search hidden" title="Hapus Pencarian"><i data-lucide="x"></i></button>
+        </div>
+      </div>
+
+      <!-- Right Header Stats -->
+      <div class="header-right">
+        <div class="stat-pill" id="fileStatsPill">
+          <span class="status-dot"></span>
+          <span id="fileStatsText">Memuat repositori...</span>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="main-content">
+    <div class="content-container">
+
+      <!-- Action & Navigation Bar -->
+      <div class="action-bar">
+        <!-- Breadcrumbs Navigation -->
+        <div class="breadcrumbs" id="breadcrumbTrail">
+          <span class="crumb active" data-folder-id="root">
+            <i data-lucide="home"></i> Repositori Utama
+          </span>
+        </div>
+
+        <!-- Action Controls -->
+        <div class="action-controls">
+          <button id="btnTriggerUpload" class="btn btn-primary" title="Unggah berkas baru">
+            <i data-lucide="upload"></i>
+            <span>Unggah Berkas</span>
+          </button>
+
+          <button id="btnTriggerNewFolder" class="btn btn-secondary" title="Buat folder baru">
+            <i data-lucide="folder-plus"></i>
+            <span>Folder Baru</span>
+          </button>
+
+          <!-- View Mode Toggles (Grid / List) -->
+          <div class="view-toggles">
+            <button id="btnGridView" class="btn-toggle active" title="Tampilan Kotak (Grid)"><i data-lucide="layout-grid"></i></button>
+            <button id="btnListView" class="btn-toggle" title="Tampilan Daftar (List)"><i data-lucide="list"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- State Kosong (Default / Empty State) -->
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon-wrap">
+          <i data-lucide="folder-open"></i>
+        </div>
+        <h3 id="emptyTitle">Repositori Masih Kosong</h3>
+        <p id="emptyDesc">Belum ada materi perkuliahan atau berkas tugas yang diunggah untuk kelas <strong>TI24A</strong>. Mulai simpan berkas dengan mengklik tombol di bawah atau seret file langsung ke halaman ini.</p>
+        <div class="empty-btn-group">
+          <button id="btnEmptyUpload" class="btn btn-primary">
+            <i data-lucide="upload"></i> Unggah Berkas Pertama
+          </button>
+          <button id="btnEmptyFolder" class="btn btn-secondary">
+            <i data-lucide="folder-plus"></i> Buat Folder Baru
+          </button>
+        </div>
+      </div>
+
+      <!-- Bagian Folder (Muncul jika ada folder) -->
+      <section id="foldersSection" class="section-block hidden">
+        <div class="section-title-row">
+          <h4 class="section-title"><i data-lucide="folder"></i> Folder</h4>
+        </div>
+        <div class="folders-grid" id="foldersContainer">
+          <!-- Folder cards dynamically injected -->
+        </div>
+      </section>
+
+      <!-- Bagian Berkas (Muncul jika ada berkas) -->
+      <section id="filesSection" class="section-block hidden">
+        <div class="section-title-row">
+          <h4 class="section-title"><i data-lucide="file-text"></i> Berkas Tersimpan</h4>
+        </div>
+        <div class="files-wrapper grid-view" id="filesContainer">
+          <!-- File cards dynamically injected -->
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Footer Minimalis -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <span>Teknik Informatika — Kelas TI24A</span>
+      <span class="footer-dot">•</span>
+      <span>Pusat Arsip Materi & Tugas Perkuliahan</span>
+    </div>
+  </footer>
+
+  <!-- Modal: Buat Folder Baru -->
+  <div id="modalNewFolder" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <i data-lucide="folder-plus" class="modal-title-icon"></i>
+          <h3>Buat Folder Baru</h3>
+        </div>
+        <button class="btn-close" data-close-modal="modalNewFolder"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <label class="input-label" for="newFolderNameInput">Nama Folder</label>
+        <input type="text" id="newFolderNameInput" class="form-input" placeholder="Contoh: Pertemuan 01 - Pengantar, Tugas AI, Praktikum PBP">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="modalNewFolder">Batal</button>
+        <button id="btnSubmitFolder" class="btn btn-primary">Buat Folder</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Pratinjau Cepat Berkas (Preview Modal) -->
+  <div id="modalPreview" class="modal-backdrop hidden">
+    <div class="modal-card modal-card-lg">
+      <div class="modal-header">
+        <div class="preview-title-wrap">
+          <div class="file-badge" id="previewBadge">FILE</div>
+          <div>
+            <h3 id="previewFileName">Nama Berkas</h3>
+            <span class="preview-meta" id="previewMeta">0 KB • Diunggah</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="btnDownloadPreview" class="btn btn-sm btn-primary">
+            <i data-lucide="download"></i> Unduh
+          </button>
+          <button class="btn-close" data-close-modal="modalPreview"><i data-lucide="x"></i></button>
+        </div>
+      </div>
+      <div class="modal-body preview-body" id="previewBody">
+        <!-- Render preview text, image, pdf iframe -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Client Script -->
+  <script src="js/app.js"></script>
+</body>
+</html>

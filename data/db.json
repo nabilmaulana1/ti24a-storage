@@ -1,0 +1,22 @@
+{
+  "folders": [
+    {
+      "id": "fld_1792932215711_gpfy",
+      "name": "ANALISIS",
+      "parentId": "root",
+      "createdAt": 1792932215711
+    }
+  ],
+  "files": [
+    {
+      "id": "file_1792932421415_skdai",
+      "name": "Modul_ADPL_P01_Konsep_RPL_dan_SDLC.docx",
+      "storedName": "1792932421402-139143068.docx",
+      "size": 80472,
+      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "extension": "docx",
+      "folderId": "fld_1792932215711_gpfy",
+      "createdAt": 1792932421415
+    }
+  ]
+}
