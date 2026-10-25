@@ -1,51 +1,42 @@
 # 🎓 Repositori Berkas — Teknik Informatika TI24A
 
-Web aplikasi repositori penyimpanan materi perkuliahan dan berkas tugas mahasiswa Teknik Informatika Kelas **TI24A**.
-
-## ✨ Fitur Utama
-- **Upload File & Drag-and-Drop**: Unggah berbagai tipe file (PDF, Dokumen, Source Code, ZIP, Gambar, dll).
-- **Struktur Folder Terorganisir**: Buat folder per mata kuliah atau per pertemuan.
-- **Pratinjau Berkas Cepat (Preview)**: Buka PDF, gambar, dan kode langsung di browser tanpa harus mengunduh dulu.
-- **Pencarian Cepat**: Cari berkas dan modul tugas dalam hitungan detik.
-- **Desain Modern & Elegan**: Menggunakan tema 2-warna bersih yang berwibawa, dirancang khusus untuk Teknik Informatika TI24A.
+Web repositori penyimpanan materi perkuliahan dan tugas praktikum mahasiswa **Teknik Informatika Kelas TI24A**, siap di-deploy ke **Netlify** dengan penyimpanan cloud bersama **Supabase**.
 
 ---
 
-## 🚀 Panduan Deploy Gratis ke Render.com (Domain Tetap 24 Jam)
+## 🚀 Cara 1: Deploy Instan ke Netlify (Paling Mudah — 15 Detik)
 
-Agar web ini selalu aktif dan punya link permanen (misal: `https://ti24a-informatika.onrender.com`):
+1. Buka browser: **[app.netlify.com/drop](https://app.netlify.com/drop)** (Login / Daftar gratis di Netlify).
+2. Tarik (Drag & Drop) seluruh folder proyek ini ke area unggah Netlify.
+3. Web Anda langsung aktif dan memiliki link permanen, misalnya:
+   👉 `https://ti24a-informatika.netlify.app`
+4. Anda bisa mengganti nama domain sesuka hati di: **Site configuration > Change site name**.
 
-### Langkah 1: Buat Repositori Baru di GitHub
-1. Buka [github.com/new](https://github.com/new)
-2. Beri nama repositori (misal: `ti24a-storage` atau `repositori-ti24a`).
-3. Pilih **Public** lalu klik **Create repository**.
-4. Di terminal folder ini, jalankan:
+---
+
+## 🌐 Cara 2: Deploy Otomatis via GitHub ke Netlify
+
+1. Buat repositori baru di [github.com/new](https://github.com/new) (misal: `ti24a-storage`).
+2. Jalankan perintah ini di terminal:
    ```bash
-   git remote add origin https://github.com/USERNAME-ANDA/NAMA-REPO.git
+   git remote add origin https://github.com/USERNAME-ANDA/ti24a-storage.git
    git branch -M main
    git push -u origin main
    ```
-
-### Langkah 2: Hubungkan ke Render.com (Gratis)
-1. Buka [dashboard.render.com](https://dashboard.render.com/) (Daftar / Login gratis dengan akun GitHub).
-2. Klik tombol **New +** > Pilih **Web Service**.
-3. Pilih repositori GitHub Anda yang baru dibuat tadi (`ti24a-storage`).
-4. Atur pengaturannya:
-   - **Name**: `ti24a-informatika` (atau nama pilihan Anda)
-   - **Environment**: `Node`
-   - **Build Command**: `npm install`
-   - **Start Command**: `node server.js`
-   - **Plan Type**: `Free`
-5. Klik **Create Web Service**.
-
-🎉 Selesai! Dalam 1-2 menit, Anda akan mendapatkan domain permanen seperti:
-👉 **`https://ti24a-informatika.onrender.com`** yang bisa diakses dosen dan seluruh teman kelas TI24A kapan saja tanpa perlu laptop Anda dinyalakan!
+3. Buka [app.netlify.com](https://app.netlify.com) > Klik **Add new site** > **Import an existing project** > Pilih **GitHub**.
+4. Pilih repositori `ti24a-storage`. Netlify akan otomatis mendeteksi konfigurasi [netlify.toml](netlify.toml). Klik **Deploy**.
 
 ---
 
-## 💻 Menjalankan di Komputer Lokal
-```bash
-npm install
-node server.js
-```
-Akses di browser: `http://localhost:3000`
+## ☁️ Menghubungkan Cloud Storage Supabase (Agar Berkas Tersinkron ke Semua Orang)
+
+Agar berkas yang diunggah dapat dilihat dan diunduh oleh seluruh teman kelas & dosen dari HP/laptop masing-masing:
+
+1. Buka **[supabase.com](https://supabase.com)** > Buat Project Baru (Gratis).
+2. Di menu **Storage**: Klik **New Bucket** > Beri nama `ti24a-files` dan centang **Public bucket**.
+3. Di menu **SQL Editor**: Salin isi berkas [supabase_setup.sql](supabase_setup.sql) lalu klik **Run**.
+4. Di menu **Project Settings > API**: Salin **Project URL** dan **anon/public key**.
+5. Buka web Netlify Anda, klik tombol **Setup Cloud** di pojok kanan atas, lalu tempelkan URL dan Key tersebut!
+
+> [!NOTE]
+> *Jika Supabase belum disetup*, web tetap bisa langsung digunakan untuk upload file dan folder di browser secara lokal tanpa error!

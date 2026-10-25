@@ -924,3 +924,83 @@ button, input {
   .action-controls { width: 100%; justify-content: space-between; }
   .files-wrapper.grid-view { grid-template-columns: 1fr; }
 }
+
+/* Cloud Status Button */
+.btn-cloud-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-right: 0.5rem;
+  transition: var(--transition);
+}
+.btn-cloud-status:hover {
+  background: var(--bg-hover);
+  border-color: #cbd5e1;
+}
+
+.status-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b; /* default pending */
+}
+.status-indicator.connected {
+  background: #10b981;
+}
+
+/* Setup Guide Box in Modal */
+.modal-info-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
+}
+
+.mb-3 {
+  margin-bottom: 1rem;
+}
+
+.setup-guide-box {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+}
+
+.setup-guide-header {
+  font-size: 0.825rem;
+  font-weight: 700;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.setup-guide-header i { width: 16px; height: 16px; }
+
+.setup-steps {
+  padding-left: 1.25rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.setup-steps li { margin-bottom: 0.25rem; }
+.setup-steps code {
+  background: #e2e8f0;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #0f172a;
+}
+.setup-steps a {
+  color: var(--primary);
+  text-decoration: underline;
+}

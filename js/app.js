@@ -1,6 +1,6 @@
 /**
  * Repositori Berkas — Teknik Informatika TI24A
- * Frontend Client terhubung ke Node.js Backend API
+ * Cloud Engine untuk Netlify (Supabase Cloud + IndexedDB Smart Fallback)
  */
 
 class AcademicRepoApp {
@@ -10,31 +10,84 @@ class AcademicRepoApp {
     this.viewMode = 'grid'; // 'grid' | 'list'
     this.searchQuery = '';
     this.currentPreviewFile = null;
+    this.supabase = null;
+    this.isCloudConnected = false;
   }
 
   async init() {
+    this.initCloudClient();
     this.bindEvents();
     await this.render();
+  }
+
+  // ==================== SUPABASE / CLOUD INIT ====================
+  initCloudClient() {
+    const url = window.ENV_CONFIG?.SUPABASE_URL || localStorage.getItem('TI24A_SUPABASE_URL');
+    const key = window.ENV_CONFIG?.SUPABASE_ANON_KEY || localStorage.getItem('TI24A_SUPABASE_KEY');
+
+    const statusDot = document.getElementById('cloudStatusDot');
+    const statusLabel = document.getElementById('cloudStatusLabel');
+
+    if (window.supabase && url && key) {
+      try {
+        this.supabase = window.supabase.createClient(url, key);
+        this.isCloudConnected = true;
+        if (statusDot) statusDot.classList.add('connected');
+        if (statusLabel) statusLabel.textContent = 'Cloud Aktif';
+        console.log('✅ Supabase Cloud Engine Terhubung');
+      } catch (err) {
+        console.warn('Gagal inisialisasi Supabase, beralih ke IndexedDB:', err);
+        this.isCloudConnected = false;
+        if (statusDot) statusDot.classList.remove('connected');
+        if (statusLabel) statusLabel.textContent = 'Setup Cloud';
+      }
+    } else {
+      this.isCloudConnected = false;
+      if (statusDot) statusDot.classList.remove('connected');
+      if (statusLabel) statusLabel.textContent = 'Setup Cloud';
+    }
   }
 
   // ==================== RENDER WORKSPACE ====================
   async render() {
     try {
-      const url = this.searchQuery 
-        ? `/api/drive?search=${encodeURIComponent(this.searchQuery)}`
-        : `/api/drive?folderId=${encodeURIComponent(this.currentFolderId)}`;
+      let folders = [];
+      let files = [];
 
-      const res = await fetch(url);
-      const data = await res.json();
-
-      const folders = data.folders || [];
-      const files = data.files || [];
+      if (this.isCloudConnected) {
+        // Mode 1: Supabase Cloud (Multi-User Shared)
+        if (this.searchQuery) {
+          const q = this.searchQuery.toLowerCase();
+          const { data: allFolders } = await this.supabase.from('folders').select('*');
+          const { data: allFiles } = await this.supabase.from('files').select('*');
+          folders = (allFolders || []).filter(f => f.name.toLowerCase().includes(q));
+          files = (allFiles || []).filter(f => f.name.toLowerCase().includes(q));
+        } else {
+          const { data: fldData } = await this.supabase.from('folders').select('*').eq('parent_id', this.currentFolderId);
+          const { data: filData } = await this.supabase.from('files').select('*').eq('folder_id', this.currentFolderId);
+          folders = fldData || [];
+          files = filData || [];
+        }
+      } else {
+        // Mode 2: IndexedDB Local Engine
+        await window.simpleDriveDB.init();
+        if (this.searchQuery) {
+          const q = this.searchQuery.toLowerCase();
+          const allFlds = await window.simpleDriveDB.getAllFolders();
+          const allFils = await window.simpleDriveDB.getAllFiles();
+          folders = allFlds.filter(f => f.name.toLowerCase().includes(q));
+          files = allFils.filter(f => f.name.toLowerCase().includes(q));
+        } else {
+          folders = await window.simpleDriveDB.getFolders(this.currentFolderId);
+          files = await window.simpleDriveDB.getFiles(this.currentFolderId);
+        }
+      }
 
       // Update Breadcrumbs
       this.renderBreadcrumbs();
 
       // Update Header Stats
-      this.updateStats();
+      await this.updateStats();
 
       const emptyState = document.getElementById('emptyState');
       const foldersSection = document.getElementById('foldersSection');
@@ -85,14 +138,15 @@ class AcademicRepoApp {
 
           if (this.viewMode === 'grid') {
             filesContainer.innerHTML = files.map(file => {
-              const iconName = this.getFileIcon(file.extension);
-              const badgeClass = this.getFormatBadgeClass(file.extension);
-              const dateStr = new Date(file.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+              const ext = file.extension || 'file';
+              const iconName = this.getFileIcon(ext);
+              const badgeClass = this.getFormatBadgeClass(ext);
+              const dateStr = new Date(file.created_at || file.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 
               return `
                 <div class="file-card" data-file-id="${file.id}">
                   <div class="file-card-preview-area">
-                    <span class="format-badge badge-${badgeClass}">${this.escapeHtml(file.extension.toUpperCase())}</span>
+                    <span class="format-badge badge-${badgeClass}">${this.escapeHtml(ext.toUpperCase())}</span>
                     <i data-lucide="${iconName}"></i>
                   </div>
                   <div class="file-card-body">
@@ -109,13 +163,14 @@ class AcademicRepoApp {
             }).join('');
           } else {
             filesContainer.innerHTML = files.map(file => {
-              const badgeClass = this.getFormatBadgeClass(file.extension);
-              const dateStr = new Date(file.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+              const ext = file.extension || 'file';
+              const badgeClass = this.getFormatBadgeClass(ext);
+              const dateStr = new Date(file.created_at || file.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
               return `
                 <div class="file-row" data-file-id="${file.id}">
                   <div class="file-row-left">
-                    <span class="format-badge badge-${badgeClass}" style="position: static;">${this.escapeHtml(file.extension.toUpperCase())}</span>
+                    <span class="format-badge badge-${badgeClass}" style="position: static;">${this.escapeHtml(ext.toUpperCase())}</span>
                     <span class="file-row-title" title="${this.escapeHtml(file.name)}">${this.escapeHtml(file.name)}</span>
                   </div>
                   <div class="file-row-right">
@@ -139,18 +194,28 @@ class AcademicRepoApp {
       }
     } catch (err) {
       console.error('Error rendering repository:', err);
-      this.showToast('Gagal memuat repositori dari server');
+      this.showToast('Gagal memuat repositori');
     }
   }
 
   async updateStats() {
     try {
-      const res = await fetch('/api/stats');
-      const stats = await res.json();
-      const text = `${stats.totalFiles || 0} berkas tersimpan (${this.formatBytes(stats.totalBytes || 0)})`;
-      document.getElementById('fileStatsText').textContent = text;
+      let count = 0;
+      let totalBytes = 0;
+
+      if (this.isCloudConnected) {
+        const { data } = await this.supabase.from('files').select('size');
+        count = (data || []).length;
+        (data || []).forEach(f => totalBytes += (f.size || 0));
+      } else {
+        const allF = await window.simpleDriveDB.getAllFiles();
+        count = allF.length;
+        allF.forEach(f => totalBytes += (f.size || 0));
+      }
+
+      document.getElementById('fileStatsText').textContent = `${count} berkas (${this.formatBytes(totalBytes)})`;
     } catch (e) {
-      document.getElementById('fileStatsText').textContent = 'Server Online';
+      document.getElementById('fileStatsText').textContent = 'Online';
     }
   }
 
@@ -177,12 +242,8 @@ class AcademicRepoApp {
   bindEvents() {
     // 1. Upload Triggers
     const fileInput = document.getElementById('globalFileInput');
-    document.getElementById('btnTriggerUpload')?.addEventListener('click', () => {
-      fileInput?.click();
-    });
-    document.getElementById('btnEmptyUpload')?.addEventListener('click', () => {
-      fileInput?.click();
-    });
+    document.getElementById('btnTriggerUpload')?.addEventListener('click', () => fileInput?.click());
+    document.getElementById('btnEmptyUpload')?.addEventListener('click', () => fileInput?.click());
 
     fileInput?.addEventListener('change', (e) => {
       if (e.target.files && e.target.files.length > 0) {
@@ -201,14 +262,9 @@ class AcademicRepoApp {
       document.getElementById('newFolderNameInput')?.focus();
     });
 
-    document.getElementById('btnSubmitFolder')?.addEventListener('click', () => {
-      this.createFolder();
-    });
-
+    document.getElementById('btnSubmitFolder')?.addEventListener('click', () => this.createFolder());
     document.getElementById('newFolderNameInput')?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        this.createFolder();
-      }
+      if (e.key === 'Enter') this.createFolder();
     });
 
     // 3. View Toggles (Grid vs List)
@@ -239,9 +295,7 @@ class AcademicRepoApp {
       }
     });
 
-    document.getElementById('brandHome')?.addEventListener('click', () => {
-      this.resetToRoot();
-    });
+    document.getElementById('brandHome')?.addEventListener('click', () => this.resetToRoot());
 
     // 5. Item Clicks (Folders, Files, Delete)
     document.addEventListener('click', async (e) => {
@@ -251,8 +305,7 @@ class AcademicRepoApp {
         e.stopPropagation();
         const fldId = btnDelFolder.dataset.folderId;
         if (confirm('Apakah Anda yakin ingin menghapus folder ini beserta seluruh isinya?')) {
-          await fetch(`/api/folders/${fldId}`, { method: 'DELETE' });
-          this.showToast('Folder berhasil dihapus');
+          await this.deleteFolder(fldId);
           await this.render();
         }
         return;
@@ -264,8 +317,7 @@ class AcademicRepoApp {
         e.stopPropagation();
         const fileId = btnDelFile.dataset.fileId;
         if (confirm('Apakah Anda yakin ingin menghapus berkas ini?')) {
-          await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
-          this.showToast('Berkas berhasil dihapus');
+          await this.deleteFile(fileId);
           await this.render();
         }
         return;
@@ -299,11 +351,7 @@ class AcademicRepoApp {
 
     searchInput?.addEventListener('input', (e) => {
       this.searchQuery = e.target.value.trim();
-      if (this.searchQuery) {
-        btnClearSearch?.classList.remove('hidden');
-      } else {
-        btnClearSearch?.classList.add('hidden');
-      }
+      btnClearSearch?.classList.toggle('hidden', !this.searchQuery);
       this.render();
     });
 
@@ -314,7 +362,37 @@ class AcademicRepoApp {
       this.render();
     });
 
-    // 7. Modal Close Buttons
+    // 7. Cloud Settings Modal
+    document.getElementById('btnOpenCloudSettings')?.addEventListener('click', () => {
+      const curUrl = localStorage.getItem('TI24A_SUPABASE_URL') || window.ENV_CONFIG?.SUPABASE_URL || '';
+      const curKey = localStorage.getItem('TI24A_SUPABASE_KEY') || window.ENV_CONFIG?.SUPABASE_ANON_KEY || '';
+      document.getElementById('inputSupabaseUrl').value = curUrl;
+      document.getElementById('inputSupabaseKey').value = curKey;
+      this.openModal('modalCloudSettings');
+    });
+
+    document.getElementById('btnSaveCloudConfig')?.addEventListener('click', async () => {
+      const url = document.getElementById('inputSupabaseUrl').value.trim();
+      const key = document.getElementById('inputSupabaseKey').value.trim();
+
+      if (!url || !key) {
+        alert('Mohon masukkan Supabase Project URL dan Anon Key!');
+        return;
+      }
+
+      localStorage.setItem('TI24A_SUPABASE_URL', url);
+      localStorage.setItem('TI24A_SUPABASE_KEY', key);
+
+      window.ENV_CONFIG.SUPABASE_URL = url;
+      window.ENV_CONFIG.SUPABASE_ANON_KEY = key;
+
+      this.initCloudClient();
+      this.closeModal('modalCloudSettings');
+      this.showToast('Konfigurasi Cloud disimpan! Memuat data...');
+      await this.render();
+    });
+
+    // 8. Modal Close Buttons
     document.querySelectorAll('[data-close-modal]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const modalId = e.currentTarget.dataset.closeModal;
@@ -322,16 +400,15 @@ class AcademicRepoApp {
       });
     });
 
-    // 8. Download from Preview
+    // 9. Download from Preview
     document.getElementById('btnDownloadPreview')?.addEventListener('click', () => {
       if (this.currentPreviewFile) {
-        window.location.href = `/api/download/${this.currentPreviewFile.id}`;
+        this.downloadFile(this.currentPreviewFile);
       }
     });
 
-    // 9. Drag & Drop Fullscreen Overlay
+    // 10. Drag & Drop Fullscreen Overlay
     const overlay = document.getElementById('dragDropOverlay');
-
     window.addEventListener('dragenter', (e) => {
       if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
         overlay?.classList.remove('hidden');
@@ -340,9 +417,7 @@ class AcademicRepoApp {
 
     overlay?.addEventListener('dragover', (e) => e.preventDefault());
     overlay?.addEventListener('dragleave', (e) => {
-      if (e.relatedTarget === null) {
-        overlay?.classList.add('hidden');
-      }
+      if (e.relatedTarget === null) overlay?.classList.add('hidden');
     });
 
     overlay?.addEventListener('drop', (e) => {
@@ -354,31 +429,81 @@ class AcademicRepoApp {
     });
   }
 
-  // ==================== FILE OPERATIONS ====================
+  // ==================== FILE & FOLDER OPERATIONS ====================
   async handleFileUpload(files) {
     if (!files || files.length === 0) return;
 
-    this.showToast(`Mengunggah ${files.length} berkas ke server...`);
+    this.showToast(`Mengunggah ${files.length} berkas...`);
 
-    const formData = new FormData();
-    formData.append('folderId', this.currentFolderId);
     for (const file of files) {
-      formData.append('files', file);
+      const ext = file.name.split('.').pop().toLowerCase();
+      const timestamp = Date.now();
+      const fileId = 'file_' + timestamp + '_' + Math.random().toString(36).substr(2, 5);
+
+      if (this.isCloudConnected) {
+        // --- UPLOAD KE SUPABASE CLOUD ---
+        try {
+          const bucket = window.ENV_CONFIG.BUCKET_NAME || 'ti24a-files';
+          const storagePath = `${this.currentFolderId}/${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+          // 1. Upload to Supabase Storage Bucket
+          const { error: uploadError } = await this.supabase.storage
+            .from(bucket)
+            .upload(storagePath, file, { upsert: true });
+
+          if (uploadError) throw uploadError;
+
+          // 2. Get Public URL
+          const { data: urlData } = this.supabase.storage.from(bucket).getPublicUrl(storagePath);
+          const publicUrl = urlData.publicUrl;
+
+          // 3. Insert record into Supabase Table
+          const { error: dbError } = await this.supabase.from('files').insert([{
+            id: fileId,
+            name: file.name,
+            folder_id: this.currentFolderId,
+            size: file.size,
+            extension: ext,
+            storage_path: storagePath,
+            public_url: publicUrl,
+            created_at: timestamp
+          }]);
+
+          if (dbError) throw dbError;
+        } catch (err) {
+          console.error('Supabase upload error:', err);
+          this.showToast(`Gagal upload cloud (${file.name}): ` + (err.message || 'Error'));
+          return;
+        }
+      } else {
+        // --- FALLBACK KE INDEXEDDB LOKAL ---
+        let textContent = null;
+        let dataUrl = null;
+
+        if (['txt', 'md', 'py', 'js', 'json', 'csv', 'html', 'css', 'sql'].includes(ext)) {
+          try { textContent = await file.text(); } catch (e) {}
+        }
+        if (file.type.startsWith('image/')) {
+          try { dataUrl = await this.readFileAsDataURL(file); } catch (e) {}
+        }
+
+        await window.simpleDriveDB.addFile({
+          id: fileId,
+          name: file.name,
+          folderId: this.currentFolderId,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          extension: ext,
+          createdAt: timestamp,
+          fileBlob: file,
+          textContent: textContent,
+          dataUrl: dataUrl
+        });
+      }
     }
 
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!res.ok) throw new Error('Gagal upload');
-      this.showToast('Berkas berhasil disimpan di repositori!');
-      await this.render();
-    } catch (err) {
-      console.error('Upload error:', err);
-      this.showToast('Terjadi kesalahan saat mengunggah berkas.');
-    }
+    this.showToast('Berkas berhasil disimpan!');
+    await this.render();
   }
 
   async createFolder() {
@@ -389,74 +514,132 @@ class AcademicRepoApp {
       return;
     }
 
-    try {
-      const res = await fetch('/api/folders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name, parentId: this.currentFolderId })
-      });
+    const folderId = 'fld_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
 
-      if (!res.ok) throw new Error('Gagal membuat folder');
-      this.closeModal('modalNewFolder');
-      if (input) input.value = '';
-      this.showToast('Folder berhasil dibuat!');
-      await this.render();
-    } catch (err) {
-      console.error(err);
-      this.showToast('Gagal membuat folder di server');
+    if (this.isCloudConnected) {
+      try {
+        const { error } = await this.supabase.from('folders').insert([{
+          id: folderId,
+          name: name,
+          parent_id: this.currentFolderId,
+          created_at: Date.now()
+        }]);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Create folder error:', err);
+        this.showToast('Gagal membuat folder di cloud: ' + err.message);
+        return;
+      }
+    } else {
+      await window.simpleDriveDB.addFolder(name, this.currentFolderId);
+    }
+
+    this.closeModal('modalNewFolder');
+    if (input) input.value = '';
+    this.showToast('Folder berhasil dibuat!');
+    await this.render();
+  }
+
+  async deleteFolder(folderId) {
+    if (this.isCloudConnected) {
+      try {
+        await this.supabase.from('folders').delete().eq('id', folderId);
+        await this.supabase.from('files').delete().eq('folder_id', folderId);
+        this.showToast('Folder berhasil dihapus');
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      await window.simpleDriveDB.deleteFolder(folderId);
+      this.showToast('Folder berhasil dihapus');
+    }
+  }
+
+  async deleteFile(fileId) {
+    if (this.isCloudConnected) {
+      try {
+        const { data: file } = await this.supabase.from('files').select('*').eq('id', fileId).single();
+        if (file && file.storage_path) {
+          const bucket = window.ENV_CONFIG.BUCKET_NAME || 'ti24a-files';
+          await this.supabase.storage.from(bucket).remove([file.storage_path]);
+        }
+        await this.supabase.from('files').delete().eq('id', fileId);
+        this.showToast('Berkas berhasil dihapus');
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      await window.simpleDriveDB.deleteFile(fileId);
+      this.showToast('Berkas berhasil dihapus');
     }
   }
 
   async openPreview(fileId) {
     try {
-      const driveRes = await fetch(`/api/drive?folderId=${this.currentFolderId}`);
-      const data = await driveRes.json();
-      let file = (data.files || []).find(f => f.id === fileId);
+      let file = null;
 
-      if (!file) {
-        const allRes = await fetch(`/api/drive?search=`);
-        const allData = await allRes.json();
-        file = (allData.files || []).find(f => f.id === fileId);
+      if (this.isCloudConnected) {
+        const { data } = await this.supabase.from('files').select('*').eq('id', fileId).single();
+        file = data;
+      } else {
+        file = await window.simpleDriveDB.getFileById(fileId);
       }
 
       if (!file) return;
       this.currentPreviewFile = file;
 
+      const ext = (file.extension || '').toLowerCase();
       document.getElementById('previewFileName').textContent = file.name;
-      document.getElementById('previewBadge').textContent = file.extension.toUpperCase();
-      document.getElementById('previewBadge').className = `file-badge badge-${this.getFormatBadgeClass(file.extension)}`;
-      document.getElementById('previewMeta').textContent = `${this.formatBytes(file.size)} • Diunggah ${new Date(file.createdAt).toLocaleDateString('id-ID')}`;
+      document.getElementById('previewBadge').textContent = ext.toUpperCase();
+      document.getElementById('previewBadge').className = `file-badge badge-${this.getFormatBadgeClass(ext)}`;
+      document.getElementById('previewMeta').textContent = `${this.formatBytes(file.size)} • Diunggah ${new Date(file.created_at || file.createdAt).toLocaleDateString('id-ID')}`;
 
       const previewBody = document.getElementById('previewBody');
-      const ext = file.extension.toLowerCase();
 
-      if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext)) {
-        // Image Preview
-        previewBody.innerHTML = `<img src="/api/preview/${file.id}" alt="${this.escapeHtml(file.name)}" class="preview-image-content">`;
-      } else if (ext === 'pdf') {
-        // PDF Inline Viewer
-        previewBody.innerHTML = `
-          <div style="height: 540px; width: 100%;">
-            <iframe src="/api/preview/${file.id}" style="width: 100%; height: 100%; border: none; border-radius: 4px; background: white;"></iframe>
-          </div>
-        `;
-      } else if (['txt', 'md', 'py', 'js', 'json', 'csv', 'html', 'css', 'sql', 'java', 'c', 'cpp'].includes(ext)) {
-        // Text / Code Fetch Preview
-        const textRes = await fetch(`/api/preview/${file.id}`);
-        const text = await textRes.text();
-        previewBody.innerHTML = `<pre class="preview-text-content">${this.escapeHtml(text)}</pre>`;
+      if (file.public_url) {
+        // Cloud Supabase Preview
+        if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext)) {
+          previewBody.innerHTML = `<img src="${file.public_url}" alt="${this.escapeHtml(file.name)}" class="preview-image-content">`;
+        } else if (ext === 'pdf') {
+          previewBody.innerHTML = `
+            <div style="height: 540px; width: 100%;">
+              <iframe src="${file.public_url}" style="width: 100%; height: 100%; border: none; border-radius: 4px; background: white;"></iframe>
+            </div>
+          `;
+        } else if (['txt', 'md', 'py', 'js', 'json', 'csv', 'html', 'css', 'sql', 'cpp', 'java'].includes(ext)) {
+          const textRes = await fetch(file.public_url);
+          const text = await textRes.text();
+          previewBody.innerHTML = `<pre class="preview-text-content">${this.escapeHtml(text)}</pre>`;
+        } else {
+          previewBody.innerHTML = `
+            <div style="text-align: center; padding: 2.5rem 1rem; color: #f8fafc;">
+              <i data-lucide="${this.getFileIcon(ext)}" style="width: 56px; height: 56px; color: #60a5fa; margin-bottom: 0.85rem;"></i>
+              <h4 style="font-size: 1.1rem; margin-bottom: 0.35rem;">${this.escapeHtml(file.name)}</h4>
+              <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 1.25rem;">Berkas tersimpan di Cloud Supabase.</p>
+              <a href="${file.public_url}" target="_blank" download="${file.name}" class="btn btn-primary btn-sm" style="display: inline-flex; text-decoration: none;">
+                <i data-lucide="download"></i> Unduh Berkas
+              </a>
+            </div>
+          `;
+        }
       } else {
-        // Fallback for docx, pptx, zip, etc.
-        previewBody.innerHTML = `
-          <div style="text-align: center; padding: 2.5rem 1rem; color: #f8fafc;">
-            <i data-lucide="${this.getFileIcon(ext)}" style="width: 56px; height: 56px; color: #60a5fa; margin-bottom: 0.85rem;"></i>
-            <h4 style="font-size: 1.1rem; margin-bottom: 0.35rem;">${this.escapeHtml(file.name)}</h4>
-            <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 1.25rem;">Berkas tersimpan aman di server repositori TI24A.</p>
-            <a href="/api/download/${file.id}" class="btn btn-primary btn-sm" style="display: inline-flex; text-decoration: none;">
-              <i data-lucide="download"></i> Unduh Berkas
-            </a>
-          </div>
-        `;
+        // Local IndexedDB Preview
+        if (file.dataUrl) {
+          previewBody.innerHTML = `<img src="${file.dataUrl}" alt="${this.escapeHtml(file.name)}" class="preview-image-content">`;
+        } else if (file.textContent !== null) {
+          previewBody.innerHTML = `<pre class="preview-text-content">${this.escapeHtml(file.textContent)}</pre>`;
+        } else {
+          previewBody.innerHTML = `
+            <div style="text-align: center; padding: 2.5rem 1rem; color: #f8fafc;">
+              <i data-lucide="${this.getFileIcon(ext)}" style="width: 56px; height: 56px; color: #60a5fa; margin-bottom: 0.85rem;"></i>
+              <h4 style="font-size: 1.1rem; margin-bottom: 0.35rem;">${this.escapeHtml(file.name)}</h4>
+              <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 1.25rem;">Berkas tersimpan lokal di browser Anda.</p>
+              <button class="btn btn-primary btn-sm" onclick="window.app.downloadFile(window.app.currentPreviewFile)">
+                <i data-lucide="download"></i> Unduh Berkas
+              </button>
+            </div>
+          `;
+        }
       }
 
       this.openModal('modalPreview');
@@ -465,6 +648,41 @@ class AcademicRepoApp {
       console.error(err);
       this.showToast('Gagal memuat pratinjau berkas');
     }
+  }
+
+  downloadFile(file) {
+    if (!file) return;
+
+    if (file.public_url) {
+      const a = document.createElement('a');
+      a.href = file.public_url;
+      a.target = '_blank';
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
+    // Local IndexedDB download
+    let blob;
+    if (file.fileBlob instanceof Blob) {
+      blob = file.fileBlob;
+    } else if (file.textContent) {
+      blob = new Blob([file.textContent], { type: file.type || 'text/plain' });
+    } else {
+      blob = new Blob([''], { type: 'application/octet-stream' });
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    this.showToast(`Mengunduh: ${file.name}`);
   }
 
   resetToRoot() {
@@ -480,6 +698,7 @@ class AcademicRepoApp {
   // ==================== HELPERS ====================
   openModal(modalId) {
     document.getElementById(modalId)?.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
   }
 
   closeModal(modalId) {
@@ -572,6 +791,15 @@ class AcademicRepoApp {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
   }
 }
 
