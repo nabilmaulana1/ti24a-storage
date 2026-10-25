@@ -1,24 +1,124 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Repositori Berkas — Teknik Informatika TI24A</title>
-  <meta name="description" content="Pusat penyimpanan berkas, materi perkuliahan, dan tugas praktikum mahasiswa Teknik Informatika Kelas TI24A berbasis Cloud Netlify & Supabase.">
-  
+  <meta name="description"
+    content="Pusat penyimpanan berkas, materi perkuliahan, dan tugas praktikum mahasiswa Teknik Informatika Kelas TI24A berbasis Cloud Netlify & Supabase.">
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    const SUPABASE_URL = "https://ihxjyilykinndaqvipig.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_iMitOa-wVFroP2SnPfcAYw_p84L09df";
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // 1. FUNGSI TAMPILKAN DATA SAAT HALAMAN DIBUKA
+    async function loadData() {
+      const { data: folders } = await supabase.from('folders').select('*');
+      const { data: files } = await supabase.from('files').select('*');
+
+      console.log("Data Folder dari Database:", folders);
+      console.log("Data File dari Database:", files);
+
+      // Panggil fungsi render UI kamu di sini jika ada
+    }
+
+    // 2. FUNGSI BUAT FOLDER (Simpan ke Storage & Tabel Database)
+    async function buatFolderBaru(namaFolder, parentId = 'root') {
+      try {
+        const folderId = 'folder_' + Date.now();
+        const folderPath = `${namaFolder}/.keep`;
+        const dummyFile = new File([""], ".keep", { type: "text/plain" });
+
+        // A. Upload file dummy ke Storage
+        await supabase.storage.from('ti24a-files').upload(folderPath, dummyFile, { upsert: true });
+
+        // B. Catat Folder ke Tabel Database 'folders'
+        const { error } = await supabase.from('folders').insert([
+          {
+            id: folderId,
+            name: namaFolder,
+            parent_id: parentId,
+            access_mode: 'editor',
+            created_at: Date.now()
+          }
+        ]);
+
+        if (error) throw error;
+
+        alert("Folder berhasil dibuat!");
+        location.reload();
+
+      } catch (err) {
+        alert("Gagal membuat folder: " + err.message);
+      }
+    }
+
+    // 3. FUNGSI UPLOAD FILE (Simpan ke Storage & Tabel Database)
+    async function uploadFileKeSupabase(file, folderId = 'root', namaFolder = '') {
+      try {
+        const fileId = 'file_' + Date.now();
+        const filePath = namaFolder ? `${namaFolder}/${file.name}` : file.name;
+
+        // A. Upload File ke Storage
+        const { error: storageErr } = await supabase.storage
+          .from('ti24a-files')
+          .upload(filePath, file, { upsert: true });
+
+        if (storageErr) throw storageErr;
+
+        // B. Ambil Link Publik Resmi
+        const { data: publicUrlData } = supabase.storage
+          .from('ti24a-files')
+          .getPublicUrl(filePath);
+
+        // C. Catat File ke Tabel Database 'files'
+        const { error: dbErr } = await supabase.from('files').insert([
+          {
+            id: fileId,
+            name: file.name,
+            folder_id: folderId,
+            size: file.size,
+            extension: file.name.split('.').pop(),
+            storage_path: filePath,
+            public_url: publicUrlData.publicUrl,
+            created_at: Date.now()
+          }
+        ]);
+
+        if (dbErr) throw dbErr;
+
+        alert("Berkas berhasil diunggah!");
+        location.reload();
+
+      } catch (err) {
+        alert("Gagal mengunggah file: " + err.message);
+      }
+    }
+
+    // Jalankan saat halaman di-load
+    document.addEventListener("DOMContentLoaded", loadData);
+  </script>
+
   <!-- Font Google: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  
+
   <!-- Supabase JS Client Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
+
   <link rel="stylesheet" href="css/styles.css">
 </head>
+
 <body>
 
   <!-- Hidden File Input for Native File Picker -->
@@ -38,7 +138,7 @@
   <!-- Header Navigasi -->
   <header class="app-header">
     <div class="header-container">
-      
+
       <!-- Brand Logo & Title -->
       <div class="brand" id="brandHome" title="Kembali ke Beranda Repositori">
         <div class="brand-badge-icon">
@@ -58,12 +158,28 @@
         <div class="search-box">
           <i data-lucide="search" class="search-icon"></i>
           <input type="text" id="searchInput" placeholder="Cari materi, tugas, modul praktikum..." autocomplete="off">
-          <button id="btnClearSearch" class="btn-clear-search hidden" title="Hapus Pencarian"><i data-lucide="x"></i></button>
+          <button id="btnClearSearch" class="btn-clear-search hidden" title="Hapus Pencarian"><i
+              data-lucide="x"></i></button>
         </div>
       </div>
 
       <!-- Right Header Actions & Cloud Status -->
       <div class="header-right">
+        <!-- Admin Badge -->
+        <div id="adminBadge" class="admin-badge hidden">
+          <i data-lucide="shield-check"></i> Admin
+        </div>
+
+        <!-- Login/Logout Admin -->
+        <button id="btnAdminLogin" class="btn-admin-login" title="Login sebagai Admin">
+          <i data-lucide="lock"></i>
+          <span>Login Admin</span>
+        </button>
+        <button id="btnAdminLogout" class="btn-admin-logout hidden" title="Keluar dari mode Admin">
+          <i data-lucide="log-out"></i>
+          <span>Keluar</span>
+        </button>
+
         <!-- Cloud Connection Status Button -->
         <button id="btnOpenCloudSettings" class="btn-cloud-status" title="Klik untuk mengatur koneksi Cloud Supabase">
           <span class="status-indicator" id="cloudStatusDot"></span>
@@ -106,8 +222,10 @@
 
           <!-- View Mode Toggles (Grid / List) -->
           <div class="view-toggles">
-            <button id="btnGridView" class="btn-toggle active" title="Tampilan Kotak (Grid)"><i data-lucide="layout-grid"></i></button>
-            <button id="btnListView" class="btn-toggle" title="Tampilan Daftar (List)"><i data-lucide="list"></i></button>
+            <button id="btnGridView" class="btn-toggle active" title="Tampilan Kotak (Grid)"><i
+                data-lucide="layout-grid"></i></button>
+            <button id="btnListView" class="btn-toggle" title="Tampilan Daftar (List)"><i
+                data-lucide="list"></i></button>
           </div>
         </div>
       </div>
@@ -118,7 +236,9 @@
           <i data-lucide="folder-open"></i>
         </div>
         <h3 id="emptyTitle">Repositori Masih Kosong</h3>
-        <p id="emptyDesc">Belum ada materi perkuliahan atau berkas tugas yang diunggah untuk kelas <strong>TI24A</strong>. Mulai simpan berkas dengan mengklik tombol di bawah atau seret file langsung ke halaman ini.</p>
+        <p id="emptyDesc">Belum ada materi perkuliahan atau berkas tugas yang diunggah untuk kelas
+          <strong>TI24A</strong>. Mulai simpan berkas dengan mengklik tombol di bawah atau seret file langsung ke
+          halaman ini.</p>
         <div class="empty-btn-group">
           <button id="btnEmptyUpload" class="btn btn-primary">
             <i data-lucide="upload"></i> Unggah Berkas Pertama
@@ -173,7 +293,8 @@
       </div>
       <div class="modal-body">
         <label class="input-label" for="newFolderNameInput">Nama Folder</label>
-        <input type="text" id="newFolderNameInput" class="form-input" placeholder="Contoh: Pertemuan 01 - Pengantar, Tugas AI, Praktikum PBP">
+        <input type="text" id="newFolderNameInput" class="form-input"
+          placeholder="Contoh: Pertemuan 01 - Pengantar, Tugas AI, Praktikum PBP">
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" data-close-modal="modalNewFolder">Batal</button>
@@ -194,26 +315,33 @@
       </div>
       <div class="modal-body">
         <p class="modal-info-text">
-          Agar berkas yang diunggah di domain <strong>.netlify.app</strong> tersimpan permanen di cloud dan bisa dibuka oleh seluruh teman kelas & dosen, hubungkan ke proyek Supabase gratis Anda:
+          Agar berkas yang diunggah di domain <strong>.netlify.app</strong> tersimpan permanen di cloud dan bisa dibuka
+          oleh seluruh teman kelas & dosen, hubungkan ke proyek Supabase gratis Anda:
         </p>
 
         <div class="form-group mb-3">
           <label class="input-label" for="inputSupabaseUrl">Supabase Project URL</label>
-          <input type="text" id="inputSupabaseUrl" class="form-input" placeholder="Contoh: https://xyzcompany.supabase.co">
+          <input type="text" id="inputSupabaseUrl" class="form-input"
+            placeholder="Contoh: https://xyzcompany.supabase.co">
         </div>
 
         <div class="form-group mb-3">
           <label class="input-label" for="inputSupabaseKey">Supabase Public Anon Key</label>
-          <input type="text" id="inputSupabaseKey" class="form-input" placeholder="Contoh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+          <input type="text" id="inputSupabaseKey" class="form-input"
+            placeholder="Contoh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
         </div>
 
         <div class="setup-guide-box">
           <div class="setup-guide-header"><i data-lucide="help-circle"></i> Panduan Cepat (1 Menit):</div>
           <ol class="setup-steps">
-            <li>Buka <strong><a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a></strong> > Buat Project Baru (Gratis).</li>
-            <li>Buka menu <strong>Storage</strong> > Klik <strong>New Bucket</strong> > Beri nama <code>ti24a-files</code> dan centang <strong>Public bucket</strong>.</li>
-            <li>Buka menu <strong>SQL Editor</strong> > Salin & Jalankan skrip dari berkas <code>supabase_setup.sql</code>.</li>
-            <li>Buka <strong>Project Settings > API</strong> > Salin <strong>Project URL</strong> dan <strong>anon/public key</strong> ke form di atas!</li>
+            <li>Buka <strong><a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a></strong> >
+              Buat Project Baru (Gratis).</li>
+            <li>Buka menu <strong>Storage</strong> > Klik <strong>New Bucket</strong> > Beri nama
+              <code>ti24a-files</code> dan centang <strong>Public bucket</strong>.</li>
+            <li>Buka menu <strong>SQL Editor</strong> > Salin & Jalankan skrip dari berkas
+              <code>supabase_setup.sql</code>.</li>
+            <li>Buka <strong>Project Settings > API</strong> > Salin <strong>Project URL</strong> dan
+              <strong>anon/public key</strong> ke form di atas!</li>
           </ol>
         </div>
       </div>
@@ -248,12 +376,77 @@
     </div>
   </div>
 
+  <!-- Modal: Login Admin -->
+  <div id="modalAdminLogin" class="modal-backdrop hidden">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <i data-lucide="shield" class="modal-title-icon"></i>
+          <h3>Login Admin</h3>
+        </div>
+        <button class="btn-close" data-close-modal="modalAdminLogin"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-info-text">Masukkan password Admin untuk mengakses fitur pengelolaan repositori (upload, hapus,
+          atur folder).</p>
+        <label class="input-label" for="adminPasswordInput">Password Admin</label>
+        <input type="password" id="adminPasswordInput" class="form-input" placeholder="Masukkan password admin..."
+          autocomplete="current-password">
+        <p id="adminLoginError" class="form-error-text"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="modalAdminLogin">Batal</button>
+        <button id="btnSubmitAdminLogin" class="btn btn-primary"><i data-lucide="unlock"></i> Masuk</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Pengaturan Mode Akses Folder -->
+  <div id="modalFolderSettings" class="modal-backdrop hidden">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <i data-lucide="folder-cog" class="modal-title-icon"></i>
+          <h3>Pengaturan Folder</h3>
+        </div>
+        <button class="btn-close" data-close-modal="modalFolderSettings"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-info-text">Folder: <strong id="folderSettingsName"></strong></p>
+        <label class="input-label">Mode Akses Publik</label>
+        <div class="access-mode-options">
+          <label class="access-mode-option" for="folderModeViewer">
+            <input type="radio" id="folderModeViewer" name="folderMode" value="viewer" checked>
+            <div class="access-mode-info">
+              <div class="access-mode-title"><i data-lucide="eye"></i> Viewer</div>
+              <div class="access-mode-desc">Publik hanya bisa melihat daftar folder. Tidak bisa upload atau hapus.</div>
+            </div>
+          </label>
+          <label class="access-mode-option" for="folderModeEditor">
+            <input type="radio" id="folderModeEditor" name="folderMode" value="editor">
+            <div class="access-mode-info">
+              <div class="access-mode-title"><i data-lucide="pencil"></i> Editor</div>
+              <div class="access-mode-desc">Publik bisa melihat <strong>dan</strong> mengunggah berkas ke folder ini.
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="modalFolderSettings">Batal</button>
+        <button id="btnSaveFolderMode" class="btn btn-primary"><i data-lucide="save"></i> Simpan Mode</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast" class="toast hidden"></div>
 
   <!-- Client Scripts -->
   <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/db.js"></script>
   <script src="js/app.js"></script>
 </body>
+
 </html>

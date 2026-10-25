@@ -1004,3 +1004,172 @@ button, input {
   color: var(--primary);
   text-decoration: underline;
 }
+
+/* ==================== ADMIN AUTH UI ==================== */
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+.admin-badge svg { width: 13px; height: 13px; }
+
+.btn-admin-login {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.38rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  border: 1.5px solid var(--border-light);
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+.btn-admin-login:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px var(--primary-glow);
+}
+.btn-admin-login svg { width: 13px; height: 13px; }
+
+.btn-admin-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.38rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  border: 1.5px solid #fca5a5;
+  color: #dc2626;
+  transition: var(--transition);
+}
+.btn-admin-logout:hover {
+  background: #fee2e2;
+}
+.btn-admin-logout svg { width: 13px; height: 13px; }
+
+/* ==================== ACCESS MODE BADGE ==================== */
+.access-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.badge-viewer {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+.badge-editor {
+  background: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+
+/* ==================== FOLDER ADMIN ACTIONS ==================== */
+.folder-admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.btn-folder-settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+.btn-folder-settings:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary-border);
+}
+.btn-folder-settings svg { width: 13px; height: 13px; }
+
+/* ==================== MODAL SMALL ==================== */
+.modal-card-sm {
+  max-width: 420px;
+}
+
+/* ==================== ACCESS MODE OPTIONS ==================== */
+.access-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.access-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-light);
+  cursor: pointer;
+  transition: var(--transition);
+  background: var(--bg-subtle);
+}
+.access-mode-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+.access-mode-option input[type="radio"] {
+  margin-top: 0.1rem;
+  accent-color: var(--primary);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.access-mode-info { flex: 1; }
+.access-mode-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.2rem;
+}
+.access-mode-title svg { width: 14px; height: 14px; }
+.access-mode-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ==================== FORM ERROR ==================== */
+.form-error-text {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--danger);
+  font-weight: 500;
+  min-height: 1.2em;
+}

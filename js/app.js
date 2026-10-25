@@ -12,12 +12,34 @@ class AcademicRepoApp {
     this.currentPreviewFile = null;
     this.supabase = null;
     this.isCloudConnected = false;
+    this._currentFolderData = null; // data folder yang sedang aktif
+  }
+
+  isAdmin() {
+    return window.simpleDriveAuth?.isAdmin() || false;
   }
 
   async init() {
     this.initCloudClient();
     this.bindEvents();
+    this.updateAdminUI();
     await this.render();
+  }
+
+  // Tampilkan/sembunyikan elemen berdasarkan status admin
+  updateAdminUI() {
+    const isAdmin = this.isAdmin();
+    const adminEls = document.querySelectorAll('.admin-only');
+    adminEls.forEach(el => {
+      el.classList.toggle('hidden', !isAdmin);
+    });
+    // Update tampilan tombol login/logout di header
+    const btnLogin = document.getElementById('btnAdminLogin');
+    const btnLogout = document.getElementById('btnAdminLogout');
+    const adminBadge = document.getElementById('adminBadge');
+    if (btnLogin) btnLogin.classList.toggle('hidden', isAdmin);
+    if (btnLogout) btnLogout.classList.toggle('hidden', !isAdmin);
+    if (adminBadge) adminBadge.classList.toggle('hidden', !isAdmin);
   }
 
   // ==================== SUPABASE / CLOUD INIT ====================
@@ -115,23 +137,37 @@ class AcademicRepoApp {
         if (folders.length > 0) {
           foldersSection.classList.remove('hidden');
           const container = document.getElementById('foldersContainer');
-          container.innerHTML = folders.map(f => `
-            <div class="folder-tile" data-folder-id="${f.id}" title="${this.escapeHtml(f.name)}">
-              <div class="folder-tile-left">
-                <div class="folder-tile-icon"><i data-lucide="folder"></i></div>
-                <span class="folder-tile-name">${this.escapeHtml(f.name)}</span>
+          container.innerHTML = folders.map(f => {
+            const mode = f.access_mode || 'viewer';
+            const modeLabel = mode === 'editor' ? 'Editor' : 'Viewer';
+            const modeCls = mode === 'editor' ? 'badge-editor' : 'badge-viewer';
+            const adminActions = this.isAdmin() ? `
+              <div class="folder-admin-actions">
+                <button class="btn-folder-settings btn-folder-mode" data-folder-id="${f.id}" title="Atur Mode Akses Folder">
+                  <i data-lucide="settings-2"></i>
+                </button>
+                <button class="btn-tile-delete btn-delete-folder" data-folder-id="${f.id}" title="Hapus Folder">
+                  <i data-lucide="trash-2"></i>
+                </button>
               </div>
-              <button class="btn-tile-delete btn-delete-folder" data-folder-id="${f.id}" title="Hapus Folder">
-                <i data-lucide="trash-2"></i>
-              </button>
-            </div>
-          `).join('');
+            ` : '';
+            return `
+              <div class="folder-tile" data-folder-id="${f.id}" title="${this.escapeHtml(f.name)}">
+                <div class="folder-tile-left">
+                  <div class="folder-tile-icon"><i data-lucide="folder"></i></div>
+                  <span class="folder-tile-name">${this.escapeHtml(f.name)}</span>
+                  <span class="access-mode-badge ${modeCls}">${modeLabel}</span>
+                </div>
+                ${adminActions}
+              </div>
+            `;
+          }).join('');
         } else {
           foldersSection.classList.add('hidden');
         }
 
-        // 2. Render Files
-        if (files.length > 0) {
+        // 2. Render Files — hanya tampil jika admin
+        if (files.length > 0 && this.isAdmin()) {
           filesSection.classList.remove('hidden');
           const filesContainer = document.getElementById('filesContainer');
           filesContainer.className = `files-wrapper ${this.viewMode === 'grid' ? 'grid-view' : 'list-view'}`;
@@ -187,6 +223,11 @@ class AcademicRepoApp {
         } else {
           filesSection.classList.add('hidden');
         }
+
+        // Jika bukan admin, sembunyikan section berkas
+        if (!this.isAdmin()) {
+          filesSection.classList.add('hidden');
+        }
       }
 
       if (window.lucide) {
@@ -240,10 +281,32 @@ class AcademicRepoApp {
 
   // ==================== EVENT LISTENERS ====================
   bindEvents() {
-    // 1. Upload Triggers
+    // 0. Admin Login / Logout
+    document.getElementById('btnAdminLogin')?.addEventListener('click', () => {
+      this.openModal('modalAdminLogin');
+      document.getElementById('adminPasswordInput')?.focus();
+    });
+    document.getElementById('btnAdminLogout')?.addEventListener('click', () => {
+      window.simpleDriveAuth.logout();
+      this.updateAdminUI();
+      this.render();
+      this.showToast('Anda telah keluar dari mode Admin.');
+    });
+    document.getElementById('btnSubmitAdminLogin')?.addEventListener('click', () => this.doAdminLogin());
+    document.getElementById('adminPasswordInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.doAdminLogin();
+    });
+
+    // 1. Upload Triggers — hanya admin
     const fileInput = document.getElementById('globalFileInput');
-    document.getElementById('btnTriggerUpload')?.addEventListener('click', () => fileInput?.click());
-    document.getElementById('btnEmptyUpload')?.addEventListener('click', () => fileInput?.click());
+    document.getElementById('btnTriggerUpload')?.addEventListener('click', () => {
+      if (!this.isAdmin()) { this.showToast('⛔ Anda harus login sebagai Admin untuk mengunggah berkas.'); return; }
+      fileInput?.click();
+    });
+    document.getElementById('btnEmptyUpload')?.addEventListener('click', () => {
+      if (!this.isAdmin()) { this.showToast('⛔ Anda harus login sebagai Admin untuk mengunggah berkas.'); return; }
+      fileInput?.click();
+    });
 
     fileInput?.addEventListener('change', (e) => {
       if (e.target.files && e.target.files.length > 0) {
@@ -254,10 +317,12 @@ class AcademicRepoApp {
 
     // 2. New Folder Triggers
     document.getElementById('btnTriggerNewFolder')?.addEventListener('click', () => {
+      if (!this.isAdmin()) { this.showToast('⛔ Hanya Admin yang dapat membuat folder.'); return; }
       this.openModal('modalNewFolder');
       document.getElementById('newFolderNameInput')?.focus();
     });
     document.getElementById('btnEmptyFolder')?.addEventListener('click', () => {
+      if (!this.isAdmin()) { this.showToast('⛔ Hanya Admin yang dapat membuat folder.'); return; }
       this.openModal('modalNewFolder');
       document.getElementById('newFolderNameInput')?.focus();
     });
@@ -266,6 +331,9 @@ class AcademicRepoApp {
     document.getElementById('newFolderNameInput')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.createFolder();
     });
+
+    // Folder Access Mode (save settings)
+    document.getElementById('btnSaveFolderMode')?.addEventListener('click', () => this.saveFolderAccessMode());
 
     // 3. View Toggles (Grid vs List)
     document.getElementById('btnGridView')?.addEventListener('click', () => {
@@ -299,10 +367,11 @@ class AcademicRepoApp {
 
     // 5. Item Clicks (Folders, Files, Delete)
     document.addEventListener('click', async (e) => {
-      // Delete Folder
+      // Delete Folder — hanya admin
       const btnDelFolder = e.target.closest('.btn-delete-folder');
       if (btnDelFolder) {
         e.stopPropagation();
+        if (!this.isAdmin()) { this.showToast('⛔ Hanya Admin yang dapat menghapus folder.'); return; }
         const fldId = btnDelFolder.dataset.folderId;
         if (confirm('Apakah Anda yakin ingin menghapus folder ini beserta seluruh isinya?')) {
           await this.deleteFolder(fldId);
@@ -311,10 +380,20 @@ class AcademicRepoApp {
         return;
       }
 
-      // Delete File
+      // Open folder settings
+      const btnFolderMode = e.target.closest('.btn-folder-mode');
+      if (btnFolderMode) {
+        e.stopPropagation();
+        const fldId = btnFolderMode.dataset.folderId;
+        await this.openFolderSettings(fldId);
+        return;
+      }
+
+      // Delete File — hanya admin
       const btnDelFile = e.target.closest('.btn-delete-file');
       if (btnDelFile) {
         e.stopPropagation();
+        if (!this.isAdmin()) { this.showToast('⛔ Hanya Admin yang dapat menghapus berkas.'); return; }
         const fileId = btnDelFile.dataset.fileId;
         if (confirm('Apakah Anda yakin ingin menghapus berkas ini?')) {
           await this.deleteFile(fileId);
@@ -693,6 +772,72 @@ class AcademicRepoApp {
     if (searchInput) searchInput.value = '';
     document.getElementById('btnClearSearch')?.classList.add('hidden');
     this.render();
+  }
+
+  // ==================== AUTH & FOLDER SETTINGS ====================
+  async doAdminLogin() {
+    const input = document.getElementById('adminPasswordInput');
+    const errorEl = document.getElementById('adminLoginError');
+    const password = input?.value || '';
+
+    if (!password) {
+      if (errorEl) errorEl.textContent = 'Masukkan password terlebih dahulu.';
+      return;
+    }
+
+    // login() sekarang synchronous (tidak perlu await)
+    const success = window.simpleDriveAuth.login(password);
+    if (success) {
+      if (input) input.value = '';
+      if (errorEl) errorEl.textContent = '';
+      this.closeModal('modalAdminLogin');
+      this.updateAdminUI();
+      await this.render();
+      this.showToast('✅ Login Admin berhasil! Selamat datang.');
+    } else {
+      if (errorEl) errorEl.textContent = '⛔ Password salah. Coba lagi.';
+      input?.select();
+    }
+  }
+
+  async openFolderSettings(folderId) {
+    let folder = null;
+    if (this.isCloudConnected) {
+      const { data } = await this.supabase.from('folders').select('*').eq('id', folderId).single();
+      folder = data;
+    } else {
+      folder = await window.simpleDriveDB.getFolderById(folderId);
+    }
+    if (!folder) return;
+
+    this._editingFolderId = folderId;
+    const currentMode = folder.access_mode || 'viewer';
+
+    document.getElementById('folderSettingsName').textContent = folder.name;
+    document.getElementById('folderModeViewer').checked = currentMode === 'viewer';
+    document.getElementById('folderModeEditor').checked = currentMode === 'editor';
+    this.openModal('modalFolderSettings');
+  }
+
+  async saveFolderAccessMode() {
+    const folderId = this._editingFolderId;
+    if (!folderId) return;
+
+    const mode = document.getElementById('folderModeEditor').checked ? 'editor' : 'viewer';
+
+    try {
+      if (this.isCloudConnected) {
+        await this.supabase.from('folders').update({ access_mode: mode }).eq('id', folderId);
+      } else {
+        await window.simpleDriveDB.updateFolder(folderId, { access_mode: mode });
+      }
+      this.closeModal('modalFolderSettings');
+      this.showToast(`Mode folder diubah ke: ${mode === 'editor' ? 'Editor (publik bisa edit)' : 'Viewer (publik hanya lihat)'}`);
+      await this.render();
+    } catch (err) {
+      console.error('Gagal update folder mode:', err);
+      this.showToast('Gagal menyimpan pengaturan folder.');
+    }
   }
 
   // ==================== HELPERS ====================

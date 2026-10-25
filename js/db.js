@@ -1,10 +1,11 @@
 /**
  * SimpleDrive Database Engine (IndexedDB)
  * Penyimpanan offline murni di browser tanpa sample data.
+ * v2: Tambah field access_mode pada folder (viewer | editor)
  */
 
 const DB_NAME = 'SimpleDriveDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class SimpleDriveDB {
   constructor() {
@@ -19,11 +20,20 @@ class SimpleDriveDB {
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
+        const oldVersion = event.oldVersion;
 
-        // Store Folders
+        // Store Folders (v1)
         if (!db.objectStoreNames.contains('folders')) {
           const folderStore = db.createObjectStore('folders', { keyPath: 'id' });
           folderStore.createIndex('parentId', 'parentId', { unique: false });
+          folderStore.createIndex('access_mode', 'access_mode', { unique: false });
+        } else if (oldVersion < 2) {
+          // Upgrade v1 → v2: tambah index access_mode
+          const tx = event.target.transaction;
+          const folderStore = tx.objectStore('folders');
+          if (!folderStore.indexNames.contains('access_mode')) {
+            folderStore.createIndex('access_mode', 'access_mode', { unique: false });
+          }
         }
 
         // Store Files
@@ -82,12 +92,13 @@ class SimpleDriveDB {
     });
   }
 
-  async addFolder(name, parentId = 'root') {
+  async addFolder(name, parentId = 'root', accessMode = 'viewer') {
     await this.init();
     const folder = {
       id: 'fld_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       name: name.trim(),
       parentId: parentId,
+      access_mode: accessMode, // 'viewer' | 'editor'
       createdAt: Date.now()
     };
     return new Promise((resolve, reject) => {
@@ -95,6 +106,20 @@ class SimpleDriveDB {
       const store = tx.objectStore('folders');
       const req = store.add(folder);
       req.onsuccess = () => resolve(folder);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async updateFolder(folderId, updates) {
+    await this.init();
+    const folder = await this.getFolderById(folderId);
+    if (!folder) throw new Error('Folder tidak ditemukan');
+    const updated = { ...folder, ...updates };
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('folders', 'readwrite');
+      const store = tx.objectStore('folders');
+      const req = store.put(updated);
+      req.onsuccess = () => resolve(updated);
       req.onerror = () => reject(req.error);
     });
   }
