@@ -96,6 +96,34 @@
 
     // Jalankan saat halaman di-load
     document.addEventListener("DOMContentLoaded", loadData);
+    document.addEventListener("DOMContentLoaded", () => {
+  const DEFAULT_URL = "https://ihxjyilykinndaqvipig.supabase.co";
+  const DEFAULT_KEY = "sb_publishable_iMitOa-wVFroP2SnPfcAYw_p84L09df";
+
+  // 1. Simpan langsung ke localStorage browser pengunjung
+  localStorage.setItem('supabase_url', DEFAULT_URL);
+  localStorage.setItem('supabase_key', DEFAULT_KEY);
+  localStorage.setItem('supabase_connected', 'true');
+
+  // 2. Isi otomatis input di modal (jika ada)
+  const inputUrl = document.getElementById('inputSupabaseUrl');
+  const inputKey = document.getElementById('inputSupabaseKey');
+  if (inputUrl) inputUrl.value = DEFAULT_URL;
+  if (inputKey) inputKey.value = DEFAULT_KEY;
+
+  // 3. Paksa sembunyikan modal jika terbuka otomatis saat pertama kali dibuka
+  const modalSettings = document.getElementById('modalCloudSettings');
+  if (modalSettings) {
+    modalSettings.classList.add('hidden');
+    modalSettings.style.display = 'none';
+  }
+
+  // 4. Ubah indikator status cloud menjadi hijau (Connected)
+  const statusDot = document.getElementById('cloudStatusDot');
+  const statusLabel = document.getElementById('cloudStatusLabel');
+  if (statusDot) statusDot.style.backgroundColor = '#10b981'; // warna hijau
+  if (statusLabel) statusLabel.textContent = 'Terhubung';
+});
   </script>
 
   <!-- Font Google: Plus Jakarta Sans & JetBrains Mono -->
