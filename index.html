@@ -26,17 +26,12 @@
       // Panggil fungsi render UI kamu di sini jika ada
     }
 
-    // 2. FUNGSI BUAT FOLDER (Simpan ke Storage & Tabel Database)
+    // 2. FUNGSI BUAT FOLDER (Cukup Simpan ke Tabel Database 'folders')
     async function buatFolderBaru(namaFolder, parentId = 'root') {
       try {
         const folderId = 'folder_' + Date.now();
-        const folderPath = `${namaFolder}/.keep`;
-        const dummyFile = new File([""], ".keep", { type: "text/plain" });
 
-        // A. Upload file dummy ke Storage
-        await supabase.storage.from('ti24a-files').upload(folderPath, dummyFile, { upsert: true });
-
-        // B. Catat Folder ke Tabel Database 'folders'
+        // Simpan metadata folder langsung ke database Supabase
         const { error } = await supabase.from('folders').insert([
           {
             id: folderId,
@@ -238,7 +233,8 @@
         <h3 id="emptyTitle">Repositori Masih Kosong</h3>
         <p id="emptyDesc">Belum ada materi perkuliahan atau berkas tugas yang diunggah untuk kelas
           <strong>TI24A</strong>. Mulai simpan berkas dengan mengklik tombol di bawah atau seret file langsung ke
-          halaman ini.</p>
+          halaman ini.
+        </p>
         <div class="empty-btn-group">
           <button id="btnEmptyUpload" class="btn btn-primary">
             <i data-lucide="upload"></i> Unggah Berkas Pertama
@@ -337,11 +333,14 @@
             <li>Buka <strong><a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a></strong> >
               Buat Project Baru (Gratis).</li>
             <li>Buka menu <strong>Storage</strong> > Klik <strong>New Bucket</strong> > Beri nama
-              <code>ti24a-files</code> dan centang <strong>Public bucket</strong>.</li>
+              <code>ti24a-files</code> dan centang <strong>Public bucket</strong>.
+            </li>
             <li>Buka menu <strong>SQL Editor</strong> > Salin & Jalankan skrip dari berkas
-              <code>supabase_setup.sql</code>.</li>
+              <code>supabase_setup.sql</code>.
+            </li>
             <li>Buka <strong>Project Settings > API</strong> > Salin <strong>Project URL</strong> dan
-              <strong>anon/public key</strong> ke form di atas!</li>
+              <strong>anon/public key</strong> ke form di atas!
+            </li>
           </ol>
         </div>
       </div>
